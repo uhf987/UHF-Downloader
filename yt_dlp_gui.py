@@ -112,7 +112,7 @@ def nice_title(url):
         return url
 
 
-def bar_text(pct, width=10):
+def bar_text(pct, width=8):
     """Listede görünen metin tabanlı ilerleme çubuğu."""
     pct = max(0.0, min(100.0, float(pct)))
     filled = int(round(width * pct / 100.0))
@@ -127,6 +127,32 @@ def make_icon_image(size=64):
     d.polygon([(24, 18), (24, 46), (48, 32)], fill=(255, 255, 255, 255))
     return img.resize((size, size)) if size != 64 else img
 
+class Tip:
+    """Düğmelerin üzerine gelince çıkan küçük ipucu balonu."""
+
+    def __init__(self, widget, text):
+        self.w, self.text, self.tw = widget, text, None
+        widget.bind("<Enter>", self._show, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _show(self, _e=None):
+        if self.tw:
+            return
+        x = self.w.winfo_rootx() + 4
+        y = self.w.winfo_rooty() + self.w.winfo_height() + 4
+        self.tw = tk.Toplevel(self.w)
+        self.tw.wm_overrideredirect(True)
+        self.tw.wm_geometry(f"+{x}+{y}")
+        tk.Label(self.tw, text=self.text, font=("Consolas", 8), bg="#333333",
+                 fg="#f0f0f0", padx=6, pady=2, bd=1, relief="solid").pack()
+
+    def _hide(self, _e=None):
+        if self.tw:
+            self.tw.destroy()
+            self.tw = None
+
+
 # ── Renkler & Font ──────────────────────────────────────────────
 BG = "#0f0f0f"
 CARD = "#1a1a1a"
@@ -138,10 +164,12 @@ SUCCESS = "#44ff88"
 BORDER = "#2a2a2a"
 PIN_ON = "#ffcc00"
 QUEUE_BG = "#111111"
+FIELD = "#252525"
+PAD = 10
 
-FONT_TITLE = ("Consolas", 22, "bold")
-FONT_LABEL = ("Consolas", 10)
-FONT_BTN = ("Consolas", 11, "bold")
+FONT_TITLE = ("Consolas", 14, "bold")
+FONT_LABEL = ("Consolas", 9)
+FONT_BTN = ("Consolas", 10, "bold")
 FONT_LOG = ("Consolas", 9)
 FONT_SMALL = ("Consolas", 8)
 
@@ -157,11 +185,11 @@ SERVER_PORT = 8765
 #  -N  : HLS/DASH (m3u8/mpd) parçalarını aynı anda N bağlantıyla indirir
 #  aria2c : düz dosyaları (mp4 vb.) çok bağlantıyla bölerek indirir, IDM'e en yakın yöntem
 SPEED_MODES = {
-    "Normal (tek bağlantı)": (1, False),
-    "Hızlı (8 parça aynı anda)": (8, False),
-    "Çok hızlı (16 parça + aria2c varsa)": (16, True),
+    "Normal (1 bağlantı)": (1, False),
+    "Hızlı (8 parça)": (8, False),
+    "Çok hızlı (16 + aria2c)": (16, True),
 }
-SPEED_DEFAULT = "Hızlı (8 parça aynı anda)"
+SPEED_DEFAULT = "Hızlı (8 parça)"
 
 
 def make_handler(app):
@@ -244,9 +272,9 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("yt-dlp İndirici")
-        self.geometry("700x860")
+        self.geometry("600x540")
         self.resizable(True, True)
-        self.minsize(680, 720)
+        self.minsize(540, 400)
         self.configure(bg=BG)
 
         self.download_dir = tk.StringVar(value=DEFAULT_DIR)
@@ -284,193 +312,188 @@ class App(tk.Tk):
         threading.Thread(target=self._worker_loop, daemon=True).start()
 
     # ── Arayüz ─────────────────────────────────────────────────
-    def _build(self):
-        hdr = tk.Frame(self, bg=BG, pady=14)
-        hdr.pack(fill="x", padx=30)
+    def _btn(self, parent, text, cmd, bg=BORDER, fg=MUTED, abg=ACCENT,
+             afg="white", padx=7, pady=2, font=FONT_SMALL):
+        return tk.Button(parent, text=text, font=font, bg=bg, fg=fg,
+                         activebackground=abg, activeforeground=afg, bd=0,
+                         cursor="hand2", padx=padx, pady=pady, command=cmd)
 
-        tk.Label(hdr, text="▶ YT-DLP", font=FONT_TITLE,
+    def _entry(self, parent, var, **kw):
+        return tk.Entry(parent, textvariable=var, font=FONT_LABEL, bg=FIELD,
+                        fg=TEXT, insertbackground=ACCENT, relief="flat", bd=0,
+                        highlightthickness=1, highlightbackground=BORDER,
+                        highlightcolor=ACCENT, **kw)
+
+    def _combo(self, parent, var, values, width):
+        return ttk.Combobox(parent, textvariable=var, values=values,
+                            state="readonly", width=width, font=FONT_LABEL,
+                            style="D.TCombobox")
+
+    def _style_widgets(self):
+        """Koyu tema: combobox, kaydırma çubuğu ve kuyruk listesi."""
+        st = ttk.Style(self)
+        try:
+            st.theme_use("clam")
+        except tk.TclError:
+            pass
+        st.configure("D.TCombobox", fieldbackground=FIELD, background=BORDER,
+                     foreground=TEXT, arrowcolor=MUTED, bordercolor=BORDER,
+                     lightcolor=FIELD, darkcolor=FIELD, selectbackground=FIELD,
+                     selectforeground=TEXT, padding=2)
+        st.map("D.TCombobox",
+               fieldbackground=[("readonly", FIELD)],
+               foreground=[("readonly", TEXT)],
+               selectbackground=[("readonly", FIELD)],
+               selectforeground=[("readonly", TEXT)],
+               arrowcolor=[("active", ACCENT)])
+        self.option_add("*TCombobox*Listbox.background", FIELD)
+        self.option_add("*TCombobox*Listbox.foreground", TEXT)
+        self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+        self.option_add("*TCombobox*Listbox.selectForeground", "white")
+        self.option_add("*TCombobox*Listbox.font", FONT_LABEL)
+        st.configure("Vertical.TScrollbar", background=BORDER, troughcolor=QUEUE_BG,
+                     bordercolor=QUEUE_BG, arrowcolor=MUTED, lightcolor=BORDER,
+                     darkcolor=BORDER, gripcount=0, arrowsize=11)
+        st.map("Vertical.TScrollbar", background=[("active", MUTED)])
+        st.configure("Q.Treeview", background=QUEUE_BG, fieldbackground=QUEUE_BG,
+                     foreground=TEXT, rowheight=20, borderwidth=0, font=FONT_LOG)
+        st.map("Q.Treeview", background=[("selected", "#333333")],
+               foreground=[("selected", TEXT)])
+        st.configure("Q.Treeview.Heading", background=BORDER, foreground=MUTED,
+                     font=FONT_SMALL, relief="flat", borderwidth=0)
+        st.map("Q.Treeview.Heading", background=[("active", BORDER)])
+
+    def _build(self):
+        self._style_widgets()
+        self._log_open = False
+
+        # ── Üst çubuk: başlık + kontrol düğmeleri (tek satır)
+        top = tk.Frame(self, bg=BG)
+        top.pack(fill="x", padx=PAD, pady=(8, 6))
+        tk.Label(top, text="▶ YT-DLP", font=FONT_TITLE,
                  fg=ACCENT, bg=BG).pack(side="left")
-        tk.Label(hdr, text=" İndirici", font=FONT_TITLE,
+        tk.Label(top, text=" İndirici", font=FONT_TITLE,
                  fg=TEXT, bg=BG).pack(side="left")
 
-        ctrl = tk.Frame(hdr, bg=BG)
-        ctrl.pack(side="right")
-
-        self.btn_tray = tk.Button(
-            ctrl, text="🗕 KÜÇÜLT", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=ACCENT,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=8, pady=5, command=self._to_tray
-        )
-        self.btn_tray.pack(side="left", padx=(0, 6))
-
+        self.btn_tray = self._btn(top, "🗕", self._to_tray, padx=8)
+        self.btn_tray.pack(side="right")
+        self.btn_pin = self._btn(top, "📌 ÜST", self._toggle_pin, abg=PIN_ON, afg="black")
+        self.btn_pin.pack(side="right", padx=(0, 4))
         # OTO varsayılan olarak kapalı başlar
-        self.btn_auto = tk.Button(
-            ctrl, text="⚡ OTO", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=ACCENT2,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=8, pady=5, command=self._toggle_auto
-        )
-        self.btn_auto.pack(side="left", padx=(0, 6))
-
-        self.btn_pin = tk.Button(
-            ctrl, text="📌 ÜST", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=PIN_ON,
-            activeforeground="black", bd=0, cursor="hand2",
-            padx=8, pady=5, command=self._toggle_pin
-        )
-        self.btn_pin.pack(side="left")
+        self.btn_auto = self._btn(top, "⚡ OTO", self._toggle_auto, abg=ACCENT2)
+        self.btn_auto.pack(side="right", padx=(0, 4))
+        Tip(self.btn_tray, "Sistem tepsisine küçült")
+        Tip(self.btn_pin, "Pencereyi her zaman üstte tut")
+        Tip(self.btn_auto, "Panoya kopyalanan bağlantıyı otomatik indir")
 
         self._card_link()
         self._card_settings()
 
-        self.btn_dl = tk.Button(
-            self, text="⬇ İNDİR", font=FONT_BTN,
-            bg=ACCENT, fg="white", activebackground=ACCENT2,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=0, pady=12, command=self._start_download
-        )
-        self.btn_dl.pack(fill="x", padx=30, pady=(4, 10))
-
-        # Sabit boyutlu alt kısımlar önce (aşağıya) yerleşir; pencere küçülürse
-        # sıkışan taraf kuyruk listesi olur, çıktı kutusu ve alt yazı değil.
-        tk.Label(self, text="yt-dlp sistemde kurulu olmalıdır",
-                 font=FONT_SMALL, fg=MUTED, bg=BG).pack(side="bottom", pady=(0, 8))
+        # Sabit boyutlu alt kısım önce yerleşir; pencere küçülürse sıkışan
+        # taraf kuyruk listesi olur.
+        self._status_bar()
         self._card_log()
         self._card_queue()
 
     def _card_link(self):
-        card = tk.Frame(self, bg=CARD, bd=0, pady=14, padx=20)
-        card.pack(fill="x", padx=30, pady=(0, 8))
-
-        tk.Label(card, text="VIDEO BAĞLANTISI", font=FONT_LABEL,
-                 fg=MUTED, bg=CARD).pack(anchor="w")
-
-        row = tk.Frame(card, bg=CARD)
-        row.pack(fill="x", pady=(6, 0))
+        card = tk.Frame(self, bg=CARD, padx=8, pady=8)
+        card.pack(fill="x", padx=PAD, pady=(0, 6))
 
         self.url_var = tk.StringVar()
-        self.entry = tk.Entry(
-            row, textvariable=self.url_var, font=FONT_LABEL,
-            bg="#252525", fg=TEXT, insertbackground=ACCENT,
-            relief="flat", bd=8
-        )
-        self.entry.pack(side="left", fill="x", expand=True)
+        self.entry = self._entry(card, self.url_var)
+        self.entry.pack(side="left", fill="x", expand=True, ipady=4)
 
-        tk.Button(
-            row, text="YAPIŞTIR", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=ACCENT,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=10, pady=8, command=self._paste
-        ).pack(side="left", padx=(6, 0))
+        self._btn(card, "YAPIŞTIR", self._paste, padx=8, pady=5
+                  ).pack(side="left", padx=(6, 0))
+
+        self.btn_dl = tk.Button(
+            card, text="⬇ İNDİR", font=FONT_BTN, bg=ACCENT, fg="white",
+            activebackground=ACCENT2, activeforeground="white", bd=0,
+            cursor="hand2", padx=14, pady=3, command=self._start_download)
+        self.btn_dl.pack(side="left", padx=(6, 0))
+        Tip(self.entry, "Video bağlantısı (panodan otomatik gelir)")
 
     def _card_settings(self):
-        card = tk.Frame(self, bg=CARD, pady=14, padx=20)
-        card.pack(fill="x", padx=30, pady=(0, 8))
+        card = tk.Frame(self, bg=CARD, padx=8, pady=6)
+        card.pack(fill="x", padx=PAD, pady=(0, 6))
 
-        tk.Label(card, text="KAYIT KLASÖRÜ", font=FONT_LABEL,
-                 fg=MUTED, bg=CARD).pack(anchor="w")
+        # Satır 1: kayıt klasörü
+        r1 = tk.Frame(card, bg=CARD)
+        r1.pack(fill="x")
+        tk.Label(r1, text="KLASÖR", font=FONT_SMALL, fg=MUTED, bg=CARD,
+                 width=6, anchor="w").pack(side="left")
+        self._btn(r1, "SEÇ", self._choose_dir, padx=8
+                  ).pack(side="right", padx=(6, 0))
+        self._entry(r1, self.download_dir).pack(
+            side="left", fill="x", expand=True, ipady=2)
 
-        row = tk.Frame(card, bg=CARD)
-        row.pack(fill="x", pady=(4, 10))
+        # Satır 2: kalite · hız · çerez
+        r2 = tk.Frame(card, bg=CARD)
+        r2.pack(fill="x", pady=(6, 0))
+        tk.Label(r2, text="KALİTE", font=FONT_SMALL, fg=MUTED, bg=CARD,
+                 width=6, anchor="w").pack(side="left")
+        self._combo(r2, self.quality,
+                    ["best", "1080p", "720p", "480p", "ses only (mp3)"], 12
+                    ).pack(side="left")
+        tk.Label(r2, text="HIZ", font=FONT_SMALL, fg=MUTED, bg=CARD
+                 ).pack(side="left", padx=(10, 4))
+        sp = self._combo(r2, self.speed, list(SPEED_MODES.keys()), 20)
+        sp.pack(side="left")
+        Tip(sp, "Parçalı indirme (IDM gibi). Çok hızlıda aria2c kuruluysa kullanılır")
 
-        tk.Entry(
-            row, textvariable=self.download_dir, font=FONT_LABEL,
-            bg="#252525", fg=TEXT, insertbackground=ACCENT,
-            relief="flat", bd=8
-        ).pack(side="left", fill="x", expand=True)
+        tk.Label(r2, text="ÇEREZ", font=FONT_SMALL, fg=MUTED, bg=CARD
+                 ).pack(side="left", padx=(10, 4))
+        self._btn(r2, "SEÇ", self._choose_cookies, padx=8
+                  ).pack(side="right", padx=(4, 0))
+        ck = self._entry(r2, self.cookies, width=8)
+        ck.pack(side="left", fill="x", expand=True, ipady=2)
+        Tip(ck, "cookies.txt dosyası. Boşsa Firefox'tan otomatik alınır")
 
-        tk.Button(
-            row, text="SEÇ", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=ACCENT,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=10, pady=8, command=self._choose_dir
-        ).pack(side="left", padx=(6, 0))
-
-        row2 = tk.Frame(card, bg=CARD)
-        row2.pack(fill="x")
-
-        ql = tk.Frame(row2, bg=CARD)
-        ql.pack(side="left", expand=True, fill="x", padx=(0, 10))
-        tk.Label(ql, text="KALİTE", font=FONT_LABEL,
-                 fg=MUTED, bg=CARD).pack(anchor="w")
-        ttk.Combobox(
-            ql, textvariable=self.quality, font=FONT_LABEL,
-            state="readonly", width=18,
-            values=["best", "1080p", "720p", "480p", "ses only (mp3)"]
-        ).pack(anchor="w", pady=(4, 0))
-
-        ck = tk.Frame(row2, bg=CARD)
-        ck.pack(side="left", expand=True, fill="x")
-        tk.Label(ck, text="COOKIES (boşsa Firefox'tan otomatik alınır)",
-                 font=FONT_LABEL, fg=MUTED, bg=CARD).pack(anchor="w")
-        crow = tk.Frame(ck, bg=CARD)
-        crow.pack(fill="x", pady=(4, 0))
-        tk.Entry(
-            crow, textvariable=self.cookies, font=FONT_LABEL,
-            bg="#252525", fg=TEXT, insertbackground=ACCENT,
-            relief="flat", bd=8, width=22
-        ).pack(side="left", fill="x", expand=True)
-        tk.Button(
-            crow, text="SEÇ", font=FONT_SMALL,
-            bg=BORDER, fg=MUTED, activebackground=ACCENT,
-            activeforeground="white", bd=0, cursor="hand2",
-            padx=8, pady=8, command=self._choose_cookies
-        ).pack(side="left", padx=(4, 0))
-
-        row3 = tk.Frame(card, bg=CARD)
-        row3.pack(fill="x", pady=(10, 0))
-        tk.Label(row3, text="İNDİRME HIZI (IDM gibi parçalı indirme)",
-                 font=FONT_LABEL, fg=MUTED, bg=CARD).pack(anchor="w")
-        ttk.Combobox(
-            row3, textvariable=self.speed, font=FONT_LABEL,
-            state="readonly", width=44, values=list(SPEED_MODES.keys())
-        ).pack(anchor="w", pady=(4, 0))
+    def _status_bar(self):
+        """Altta tek satır: son çıktı satırı + çıktı kutusunu aç/kapat."""
+        bar = tk.Frame(self, bg=BG)
+        bar.pack(side="bottom", fill="x", padx=PAD, pady=(0, 6))
+        self.btn_log = self._btn(bar, "▸ ÇIKTI", self._toggle_log, padx=6, pady=1)
+        self.btn_log.pack(side="right")
+        self._btn(bar, "🗑", self._clear_log, padx=6, pady=1
+                  ).pack(side="right", padx=(0, 4))
+        self.lbl_status = tk.Label(bar, text="Hazır", font=FONT_SMALL,
+                                   fg=MUTED, bg=BG, anchor="w")
+        self.lbl_status.pack(side="left", fill="x", expand=True)
 
     def _card_queue(self):
-        card = tk.Frame(self, bg=CARD, pady=10, padx=14)
-        card.pack(fill="both", expand=True, padx=30, pady=(0, 8))
+        card = tk.Frame(self, bg=CARD, padx=8, pady=6)
+        card.pack(fill="both", expand=True, padx=PAD, pady=(0, 6))
+        self.queue_card = card
 
         head = tk.Frame(card, bg=CARD)
         head.pack(fill="x")
-        tk.Label(head, text="KUYRUK", font=FONT_LABEL,
-                 fg=MUTED, bg=CARD).pack(side="left")
+        tk.Label(head, text="KUYRUK", font=FONT_SMALL, fg=TEXT,
+                 bg=CARD).pack(side="left")
+        self.lbl_queue = tk.Label(head, text="Kuyruk boş", font=FONT_SMALL,
+                                  fg=MUTED, bg=CARD, anchor="w")
+        self.lbl_queue.pack(side="left", padx=(8, 0))
 
         # Sağdan sola dizildiği için ters sırayla ekleniyor
-        for text, cmd in reversed([
-            ("⏹ İPTAL", self._cancel_selected),
-            ("↻ TEKRAR", self._retry_selected),
-            ("✕ KALDIR", self._remove_selected),
-            ("🧹 BİTENLER", self._clear_finished),
-            ("📂 KLASÖR", self._open_selected_folder),
+        for text, tip, cmd in reversed([
+            ("⏹", "İptal", self._cancel_selected),
+            ("↻", "Yeniden dene", self._retry_selected),
+            ("✕", "Listeden kaldır", self._remove_selected),
+            ("🧹", "Bitenleri temizle", self._clear_finished),
+            ("📂", "Klasörü aç", self._open_selected_folder),
         ]):
-            tk.Button(head, text=text, font=FONT_SMALL, bg=BORDER, fg=MUTED,
-                      activebackground=ACCENT, activeforeground="white",
-                      bd=0, cursor="hand2", padx=6, pady=3, command=cmd
-                      ).pack(side="right", padx=(4, 0))
-
-        # Durum özeti ayrı satırda: uzun metin düğmeleri sıkıştırıp kesmesin
-        self.lbl_queue = tk.Label(card, text="Kuyruk boş", font=FONT_SMALL,
-                                  fg=MUTED, bg=CARD, anchor="w")
-        self.lbl_queue.pack(fill="x", pady=(4, 0))
-
-        style = ttk.Style(self)
-        style.configure("Q.Treeview", background=QUEUE_BG, fieldbackground=QUEUE_BG,
-                        foreground=TEXT, rowheight=24, borderwidth=0, font=FONT_LOG)
-        style.map("Q.Treeview",
-                  background=[("selected", "#333333")],
-                  foreground=[("selected", TEXT)])
-        style.configure("Q.Treeview.Heading", background=BORDER, foreground=MUTED,
-                        font=FONT_SMALL, relief="flat")
+            b = self._btn(head, text, cmd, padx=6, pady=1)
+            b.pack(side="right", padx=(3, 0))
+            Tip(b, tip)
 
         wrap = tk.Frame(card, bg=QUEUE_BG)
-        wrap.pack(fill="both", expand=True, pady=(8, 0))
+        wrap.pack(fill="both", expand=True, pady=(6, 0))
 
         cols = ("name", "status", "progress", "speed", "eta")
         heads = ("DOSYA", "DURUM", "İLERLEME", "HIZ", "KALAN")
-        widths = (190, 110, 140, 85, 60)
+        widths = (150, 95, 105, 70, 50)
         self.tree = ttk.Treeview(wrap, columns=cols, show="headings",
-                                 selectmode="extended", height=6,
+                                 selectmode="extended", height=5,
                                  style="Q.Treeview")
         for c, h, w in zip(cols, heads, widths):
             self.tree.heading(c, text=h, anchor="w")
@@ -497,30 +520,37 @@ class App(tk.Tk):
         self.tree.bind("<Delete>", lambda e: self._remove_selected())
 
     def _card_log(self):
-        card = tk.Frame(self, bg=CARD, pady=10, padx=14)
-        card.pack(side="bottom", fill="x", padx=30, pady=(0, 6))
-
-        header = tk.Frame(card, bg=CARD)
-        header.pack(fill="x")
-        tk.Label(header, text="ÇIKTI", font=FONT_LABEL,
-                 fg=MUTED, bg=CARD).pack(side="left")
-        tk.Button(header, text="TEMİZLE", font=FONT_SMALL,
-                  bg=BORDER, fg=MUTED, bd=0, cursor="hand2",
-                  padx=6, pady=2,
-                  command=lambda: self.log.config(state="normal") or
-                  self.log.delete("1.0", "end") or
-                  self.log.config(state="disabled")
-                  ).pack(side="right")
-
+        """Çıktı kutusu varsayılan olarak gizli; '▸ ÇIKTI' ile açılır."""
+        card = tk.Frame(self, bg=CARD, padx=6, pady=6)
+        self.log_card = card          # pack edilmez, _toggle_log gösterir
+        sb = ttk.Scrollbar(card, orient="vertical")
         self.log = tk.Text(
-            card, font=FONT_LOG, bg="#111111", fg="#aaaaaa",
-            relief="flat", bd=0, state="disabled",
-            height=5, wrap="word"
-        )
-        self.log.pack(fill="x", pady=(6, 0))
+            card, font=FONT_LOG, bg=QUEUE_BG, fg="#aaaaaa", relief="flat",
+            bd=0, state="disabled", height=6, wrap="word",
+            yscrollcommand=sb.set)
+        sb.config(command=self.log.yview)
+        self.log.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
         self.log.tag_config("ok", foreground=SUCCESS)
         self.log.tag_config("err", foreground=ACCENT)
         self.log.tag_config("inf", foreground="#aaaaff")
+
+    def _toggle_log(self):
+        if self._log_open:
+            self.log_card.pack_forget()
+            self.btn_log.config(text="▸ ÇIKTI")
+        else:
+            self.log_card.pack(side="bottom", fill="x", padx=PAD, pady=(0, 4),
+                               before=self.queue_card)
+            self.log.see("end")
+            self.btn_log.config(text="▾ ÇIKTI")
+        self._log_open = not self._log_open
+
+    def _clear_log(self):
+        self.log.config(state="normal")
+        self.log.delete("1.0", "end")
+        self.log.config(state="disabled")
+        self.lbl_status.config(text="Hazır", fg=MUTED)
 
     # ── Toggle'lar ─────────────────────────────────────────────
     def _toggle_auto(self):
@@ -768,6 +798,11 @@ class App(tk.Tk):
         self.log.insert("end", text, tag)
         self.log.see("end")
         self.log.config(state="disabled")
+        # Çıktı kutusu kapalıyken de son satır alt çubukta görünsün
+        last = next((l.strip() for l in reversed(text.splitlines()) if l.strip()), "")
+        if last and hasattr(self, "lbl_status"):
+            color = {"ok": SUCCESS, "err": ACCENT, "inf": "#aaaaff"}.get(tag, MUTED)
+            self.lbl_status.config(text=short(last, 90), fg=color)
 
     def _unique_path(self, path):
         if not os.path.exists(path):
@@ -1077,7 +1112,7 @@ class App(tk.Tk):
             prog = bar_text(j["percent"])
         else:
             prog = ""
-        return (f"#{j['id']}  {short(j['title'], 36)}", status, prog,
+        return (f"#{j['id']}  {short(j['title'], 24)}", status, prog,
                 j["speed_txt"], j["eta"])
 
     def _refresh_tree(self):
