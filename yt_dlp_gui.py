@@ -61,12 +61,12 @@ def find_ytdlp():
 
 
 # ── Kuyruk durumları ───────────────────────────────────────────
-ST_WAIT = "bekliyor"
-ST_RUN = "indiriliyor"
-ST_MERGE = "birleştiriliyor"
-ST_DONE = "tamamlandı"
-ST_ERR = "hata"
-ST_CANCEL = "iptal edildi"
+ST_WAIT = "waiting"
+ST_RUN = "downloading"
+ST_MERGE = "merging"
+ST_DONE = "completed"
+ST_ERR = "error"
+ST_CANCEL = "cancelled"
 ACTIVE = (ST_WAIT, ST_RUN, ST_MERGE)
 STATUS_TAG = {ST_WAIT: "wait", ST_RUN: "run", ST_MERGE: "merge",
               ST_DONE: "done", ST_ERR: "err", ST_CANCEL: "cancel"}
@@ -185,11 +185,11 @@ SERVER_PORT = 8765
 #  -N  : HLS/DASH (m3u8/mpd) parçalarını aynı anda N bağlantıyla indirir
 #  aria2c : düz dosyaları (mp4 vb.) çok bağlantıyla bölerek indirir, IDM'e en yakın yöntem
 SPEED_MODES = {
-    "Normal (1 bağlantı)": (1, False),
-    "Hızlı (8 parça)": (8, False),
-    "Çok hızlı (16 + aria2c)": (16, True),
+    "Normal (1 connection)": (1, False),
+    "Fast (8 parts)": (8, False),
+    "Very fast (16 + aria2c)": (16, True),
 }
-SPEED_DEFAULT = "Hızlı (8 parça)"
+SPEED_DEFAULT = "Very fast (16 + aria2c)"
 
 
 def make_handler(app):
@@ -271,7 +271,7 @@ def make_handler(app):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("yt-dlp İndirici")
+        self.title("UHF Downloader")
         self.geometry("600x540")
         self.resizable(True, True)
         self.minsize(540, 400)
@@ -370,21 +370,21 @@ class App(tk.Tk):
         # ── Üst çubuk: başlık + kontrol düğmeleri (tek satır)
         top = tk.Frame(self, bg=BG)
         top.pack(fill="x", padx=PAD, pady=(8, 6))
-        tk.Label(top, text="▶ YT-DLP", font=FONT_TITLE,
+        tk.Label(top, text="▶ UHF", font=FONT_TITLE,
                  fg=ACCENT, bg=BG).pack(side="left")
-        tk.Label(top, text=" İndirici", font=FONT_TITLE,
+        tk.Label(top, text=" Downloader", font=FONT_TITLE,
                  fg=TEXT, bg=BG).pack(side="left")
 
         self.btn_tray = self._btn(top, "🗕", self._to_tray, padx=8)
         self.btn_tray.pack(side="right")
-        self.btn_pin = self._btn(top, "📌 ÜST", self._toggle_pin, abg=PIN_ON, afg="black")
+        self.btn_pin = self._btn(top, "📌 TOP", self._toggle_pin, abg=PIN_ON, afg="black")
         self.btn_pin.pack(side="right", padx=(0, 4))
         # OTO varsayılan olarak kapalı başlar
-        self.btn_auto = self._btn(top, "⚡ OTO", self._toggle_auto, abg=ACCENT2)
+        self.btn_auto = self._btn(top, "⚡ AUTO", self._toggle_auto, abg=ACCENT2)
         self.btn_auto.pack(side="right", padx=(0, 4))
-        Tip(self.btn_tray, "Sistem tepsisine küçült")
-        Tip(self.btn_pin, "Pencereyi her zaman üstte tut")
-        Tip(self.btn_auto, "Panoya kopyalanan bağlantıyı otomatik indir")
+        Tip(self.btn_tray, "Minimize to system tray")
+        Tip(self.btn_pin, "Keep window always on top")
+        Tip(self.btn_auto, "Auto-download links copied to clipboard")
 
         self._card_link()
         self._card_settings()
@@ -403,15 +403,15 @@ class App(tk.Tk):
         self.entry = self._entry(card, self.url_var)
         self.entry.pack(side="left", fill="x", expand=True, ipady=4)
 
-        self._btn(card, "YAPIŞTIR", self._paste, padx=8, pady=5
+        self._btn(card, "PASTE", self._paste, padx=8, pady=5
                   ).pack(side="left", padx=(6, 0))
 
         self.btn_dl = tk.Button(
-            card, text="⬇ İNDİR", font=FONT_BTN, bg=ACCENT, fg="white",
+            card, text="⬇ DOWNLOAD", font=FONT_BTN, bg=ACCENT, fg="white",
             activebackground=ACCENT2, activeforeground="white", bd=0,
             cursor="hand2", padx=14, pady=3, command=self._start_download)
         self.btn_dl.pack(side="left", padx=(6, 0))
-        Tip(self.entry, "Video bağlantısı (panodan otomatik gelir)")
+        Tip(self.entry, "Video link (filled in automatically from clipboard)")
 
     def _card_settings(self):
         card = tk.Frame(self, bg=CARD, padx=8, pady=6)
@@ -420,9 +420,9 @@ class App(tk.Tk):
         # Satır 1: kayıt klasörü
         r1 = tk.Frame(card, bg=CARD)
         r1.pack(fill="x")
-        tk.Label(r1, text="KLASÖR", font=FONT_SMALL, fg=MUTED, bg=CARD,
+        tk.Label(r1, text="FOLDER", font=FONT_SMALL, fg=MUTED, bg=CARD,
                  width=6, anchor="w").pack(side="left")
-        self._btn(r1, "SEÇ", self._choose_dir, padx=8
+        self._btn(r1, "BROWSE", self._choose_dir, padx=8
                   ).pack(side="right", padx=(6, 0))
         self._entry(r1, self.download_dir).pack(
             side="left", fill="x", expand=True, ipady=2)
@@ -430,34 +430,34 @@ class App(tk.Tk):
         # Satır 2: kalite · hız · çerez
         r2 = tk.Frame(card, bg=CARD)
         r2.pack(fill="x", pady=(6, 0))
-        tk.Label(r2, text="KALİTE", font=FONT_SMALL, fg=MUTED, bg=CARD,
+        tk.Label(r2, text="QUALITY", font=FONT_SMALL, fg=MUTED, bg=CARD,
                  width=6, anchor="w").pack(side="left")
         self._combo(r2, self.quality,
-                    ["best", "1080p", "720p", "480p", "ses only (mp3)"], 12
+                    ["best", "1080p", "720p", "480p", "audio only (mp3)"], 12
                     ).pack(side="left")
-        tk.Label(r2, text="HIZ", font=FONT_SMALL, fg=MUTED, bg=CARD
+        tk.Label(r2, text="SPEED", font=FONT_SMALL, fg=MUTED, bg=CARD
                  ).pack(side="left", padx=(10, 4))
         sp = self._combo(r2, self.speed, list(SPEED_MODES.keys()), 20)
         sp.pack(side="left")
-        Tip(sp, "Parçalı indirme (IDM gibi). Çok hızlıda aria2c kuruluysa kullanılır")
+        Tip(sp, "Segmented download (like IDM). Very fast uses aria2c if installed")
 
-        tk.Label(r2, text="ÇEREZ", font=FONT_SMALL, fg=MUTED, bg=CARD
+        tk.Label(r2, text="COOKIES", font=FONT_SMALL, fg=MUTED, bg=CARD
                  ).pack(side="left", padx=(10, 4))
-        self._btn(r2, "SEÇ", self._choose_cookies, padx=8
+        self._btn(r2, "BROWSE", self._choose_cookies, padx=8
                   ).pack(side="right", padx=(4, 0))
         ck = self._entry(r2, self.cookies, width=8)
         ck.pack(side="left", fill="x", expand=True, ipady=2)
-        Tip(ck, "cookies.txt dosyası. Boşsa Firefox'tan otomatik alınır")
+        Tip(ck, "cookies.txt file. If empty, cookies are taken from Firefox")
 
     def _status_bar(self):
         """Altta tek satır: son çıktı satırı + çıktı kutusunu aç/kapat."""
         bar = tk.Frame(self, bg=BG)
         bar.pack(side="bottom", fill="x", padx=PAD, pady=(0, 6))
-        self.btn_log = self._btn(bar, "▸ ÇIKTI", self._toggle_log, padx=6, pady=1)
+        self.btn_log = self._btn(bar, "▸ LOG", self._toggle_log, padx=6, pady=1)
         self.btn_log.pack(side="right")
         self._btn(bar, "🗑", self._clear_log, padx=6, pady=1
                   ).pack(side="right", padx=(0, 4))
-        self.lbl_status = tk.Label(bar, text="Hazır", font=FONT_SMALL,
+        self.lbl_status = tk.Label(bar, text="Ready", font=FONT_SMALL,
                                    fg=MUTED, bg=BG, anchor="w")
         self.lbl_status.pack(side="left", fill="x", expand=True)
 
@@ -468,19 +468,19 @@ class App(tk.Tk):
 
         head = tk.Frame(card, bg=CARD)
         head.pack(fill="x")
-        tk.Label(head, text="KUYRUK", font=FONT_SMALL, fg=TEXT,
+        tk.Label(head, text="QUEUE", font=FONT_SMALL, fg=TEXT,
                  bg=CARD).pack(side="left")
-        self.lbl_queue = tk.Label(head, text="Kuyruk boş", font=FONT_SMALL,
+        self.lbl_queue = tk.Label(head, text="Queue empty", font=FONT_SMALL,
                                   fg=MUTED, bg=CARD, anchor="w")
         self.lbl_queue.pack(side="left", padx=(8, 0))
 
         # Sağdan sola dizildiği için ters sırayla ekleniyor
         for text, tip, cmd in reversed([
-            ("⏹", "İptal", self._cancel_selected),
-            ("↻", "Yeniden dene", self._retry_selected),
-            ("✕", "Listeden kaldır", self._remove_selected),
-            ("🧹", "Bitenleri temizle", self._clear_finished),
-            ("📂", "Klasörü aç", self._open_selected_folder),
+            ("⏹", "Cancel", self._cancel_selected),
+            ("↻", "Retry", self._retry_selected),
+            ("✕", "Remove from list", self._remove_selected),
+            ("🧹", "Clear finished", self._clear_finished),
+            ("📂", "Open folder", self._open_selected_folder),
         ]):
             b = self._btn(head, text, cmd, padx=6, pady=1)
             b.pack(side="right", padx=(3, 0))
@@ -490,8 +490,8 @@ class App(tk.Tk):
         wrap.pack(fill="both", expand=True, pady=(6, 0))
 
         cols = ("name", "status", "progress", "speed", "eta")
-        heads = ("DOSYA", "DURUM", "İLERLEME", "HIZ", "KALAN")
-        widths = (150, 95, 105, 70, 50)
+        heads = ("FILE", "STATUS", "PROGRESS", "SPEED", "ETA")
+        widths = (140, 105, 105, 70, 50)
         self.tree = ttk.Treeview(wrap, columns=cols, show="headings",
                                  selectmode="extended", height=5,
                                  style="Q.Treeview")
@@ -511,16 +511,16 @@ class App(tk.Tk):
         # Sağ tık menüsü ve Delete tuşu
         self.qmenu = tk.Menu(self, tearoff=0, bg=CARD, fg=TEXT,
                              activebackground=ACCENT, activeforeground="white", bd=0)
-        self.qmenu.add_command(label="⏹ İptal", command=self._cancel_selected)
-        self.qmenu.add_command(label="↻ Yeniden dene", command=self._retry_selected)
-        self.qmenu.add_command(label="✕ Listeden kaldır", command=self._remove_selected)
+        self.qmenu.add_command(label="⏹ Cancel", command=self._cancel_selected)
+        self.qmenu.add_command(label="↻ Retry", command=self._retry_selected)
+        self.qmenu.add_command(label="✕ Remove from list", command=self._remove_selected)
         self.qmenu.add_separator()
-        self.qmenu.add_command(label="📂 Klasörü aç", command=self._open_selected_folder)
+        self.qmenu.add_command(label="📂 Open folder", command=self._open_selected_folder)
         self.tree.bind("<Button-3>", self._on_tree_rightclick)
         self.tree.bind("<Delete>", lambda e: self._remove_selected())
 
     def _card_log(self):
-        """Çıktı kutusu varsayılan olarak gizli; '▸ ÇIKTI' ile açılır."""
+        """Çıktı kutusu varsayılan olarak gizli; '▸ LOG' ile açılır."""
         card = tk.Frame(self, bg=CARD, padx=6, pady=6)
         self.log_card = card          # pack edilmez, _toggle_log gösterir
         sb = ttk.Scrollbar(card, orient="vertical")
@@ -538,53 +538,53 @@ class App(tk.Tk):
     def _toggle_log(self):
         if self._log_open:
             self.log_card.pack_forget()
-            self.btn_log.config(text="▸ ÇIKTI")
+            self.btn_log.config(text="▸ LOG")
         else:
             self.log_card.pack(side="bottom", fill="x", padx=PAD, pady=(0, 4),
                                before=self.queue_card)
             self.log.see("end")
-            self.btn_log.config(text="▾ ÇIKTI")
+            self.btn_log.config(text="▾ LOG")
         self._log_open = not self._log_open
 
     def _clear_log(self):
         self.log.config(state="normal")
         self.log.delete("1.0", "end")
         self.log.config(state="disabled")
-        self.lbl_status.config(text="Hazır", fg=MUTED)
+        self.lbl_status.config(text="Ready", fg=MUTED)
 
     # ── Toggle'lar ─────────────────────────────────────────────
     def _toggle_auto(self):
         self._auto_dl.set(not self._auto_dl.get())
         if self._auto_dl.get():
-            self.btn_auto.config(bg=ACCENT, fg="white", text="⚡ OTO")
+            self.btn_auto.config(bg=ACCENT, fg="white", text="⚡ AUTO")
         else:
-            self.btn_auto.config(bg=BORDER, fg=MUTED, text="⚡ OTO")
+            self.btn_auto.config(bg=BORDER, fg=MUTED, text="⚡ AUTO")
 
     def _toggle_pin(self):
         self._always_top.set(not self._always_top.get())
         if self._always_top.get():
             self.attributes("-topmost", True)
-            self.btn_pin.config(bg=PIN_ON, fg="black", text="📌 ÜST")
+            self.btn_pin.config(bg=PIN_ON, fg="black", text="📌 TOP")
         else:
             self.attributes("-topmost", False)
-            self.btn_pin.config(bg=BORDER, fg=MUTED, text="📌 ÜST")
+            self.btn_pin.config(bg=BORDER, fg=MUTED, text="📌 TOP")
 
     # ── Sistem tepsisi ─────────────────────────────────────────
     def _to_tray(self):
         if not HAS_TRAY:
             messagebox.showinfo(
-                "Tepsi desteği yok",
-                "Tepsiye küçültmek için şunu kurmalısın:\n\n"
+                "No tray support",
+                "To minimize to the tray, install:\n\n"
                 "pip install pystray pillow")
             return
         if self._tray is None:
             menu = pystray.Menu(
-                pystray.MenuItem("Göster", lambda: self._ui_q.put(("show", "")),
+                pystray.MenuItem("Show", lambda: self._ui_q.put(("show", "")),
                                  default=True),
-                pystray.MenuItem("Çıkış", lambda: self._ui_q.put(("quit", ""))),
+                pystray.MenuItem("Quit", lambda: self._ui_q.put(("quit", ""))),
             )
             self._tray = pystray.Icon(
-                "ytdlp_indirici", make_icon_image(), "yt-dlp İndirici", menu)
+                "uhf_downloader", make_icon_image(), "UHF Downloader", menu)
             self._tray.run_detached()
         self.withdraw()
 
@@ -603,15 +603,15 @@ class App(tk.Tk):
         """Pencere tepsideyken küçük bir bildirim gösterir."""
         if self._tray is not None:
             try:
-                self._tray.notify(text, "yt-dlp İndirici")
+                self._tray.notify(text, "UHF Downloader")
             except Exception:
                 pass
 
     def _quit(self):
         active = [j for j in self._jobs_list if j["status"] in ACTIVE]
         if active and not messagebox.askyesno(
-                "Çıkış", f"{len(active)} indirme sürüyor ya da bekliyor.\n"
-                         "Yine de çıkılsın mı?"):
+                "Quit", f"{len(active)} download(s) running or waiting.\n"
+                         "Quit anyway?"):
             return
         for j in self._jobs_list:
             if j.get("proc"):
@@ -658,12 +658,12 @@ class App(tk.Tk):
             threading.Thread(target=self._server.serve_forever,
                              daemon=True).start()
             self._write_log(
-                f"🌐 Eklenti bağlantısı hazır (127.0.0.1:{SERVER_PORT})\n", "inf")
+                f"🌐 Extension link ready (127.0.0.1:{SERVER_PORT})\n", "inf")
         except OSError:
             self._server = None
             self._write_log(
-                f"⚠ {SERVER_PORT} portu kullanımda, eklentiden gönderme çalışmaz. "
-                "Aracın başka bir kopyası açık olabilir.\n", "err")
+                f"⚠ Port {SERVER_PORT} is in use, sending from the extension will not work. "
+                "Another copy of the app may be open.\n", "err")
 
     def _poll_jobs(self):
         """Eklentiden 'Araca gönder' ile gelen işleri kuyruğa ekle."""
@@ -788,7 +788,7 @@ class App(tk.Tk):
 
     def _choose_cookies(self):
         f = filedialog.askopenfilename(
-            filetypes=[("Text/cookies", "*.txt"), ("Tümü", "*.*")]
+            filetypes=[("Text/cookies", "*.txt"), ("All files", "*.*")]
         )
         if f:
             self.cookies.set(f)
@@ -834,9 +834,9 @@ class App(tk.Tk):
             "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
             "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]",
             "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "ses only (mp3)": "bestaudio/best",
+            "audio only (mp3)": "bestaudio/best",
         }.get(q, "bestvideo+bestaudio/best")
-        if q == "ses only (mp3)":
+        if q == "audio only (mp3)":
             return ["-x", "--audio-format", "mp3"]
         return ["-f", fmt]
 
@@ -849,18 +849,18 @@ class App(tk.Tk):
         """
         n, want_aria = SPEED_MODES.get(mode, SPEED_MODES[SPEED_DEFAULT])
         if n <= 1:
-            return [], "Hız: normal (tek bağlantı)"
+            return [], "Speed: normal (single connection)"
         args = ["-N", str(n)]
-        msg = f"Hız: {n} parça aynı anda"
+        msg = f"Speed: {n} parts at once"
         if want_aria:
             aria = shutil.which("aria2c")
             if aria:
                 args += ["--downloader", "aria2c",
                          "--downloader", "dash,m3u8:native",
                          "--downloader-args", "aria2c:-x16 -s16 -k1M"]
-                msg += " + aria2c (düz dosyalar için)"
+                msg += " + aria2c (for plain files)"
             else:
-                msg += " (aria2c bulunamadı, sadece parçalı indirme)"
+                msg += " (aria2c not found, segmented download only)"
         return args, msg
 
     # ── Kuyruk ─────────────────────────────────────────────────
@@ -868,7 +868,7 @@ class App(tk.Tk):
         """İNDİR düğmesi / OTO: kutudaki bağlantıyı kuyruğa ekler."""
         url = self.url_var.get().strip()
         if not url:
-            messagebox.showerror("Hata", "Lütfen bir bağlantı girin.")
+            messagebox.showerror("Error", "Please enter a link.")
             return
         hdrs = self._hdrs if url == self._hdrs_url else {}
         self._enqueue(url, hdrs)
@@ -883,7 +883,7 @@ class App(tk.Tk):
         headers = dict(headers or {})
         for j in self._jobs_list:
             if j["url"] == url and j["status"] in ACTIVE:
-                self._write_log("↪ Bu bağlantı zaten kuyrukta, atlandı.\n", "inf")
+                self._write_log("↪ This link is already in the queue, skipped.\n", "inf")
                 return None
 
         self._next_id += 1
@@ -897,8 +897,8 @@ class App(tk.Tk):
         }
         self._jobs_list.append(job)
         self._pending.put(job)
-        extra = f" (başlıklar: {', '.join(headers)})" if headers else ""
-        self._write_log(f"➕ [#{job['id']}] Kuyruğa eklendi: {short(url, 80)}{extra}\n", "inf")
+        extra = f" (headers: {', '.join(headers)})" if headers else ""
+        self._write_log(f"➕ [#{job['id']}] Added to queue: {short(url, 80)}{extra}\n", "inf")
         self._refresh_tree()
         return job
 
@@ -974,12 +974,12 @@ class App(tk.Tk):
         status = ST_ERR
         try:
             job["status"] = ST_RUN
-            job["note"] = "hazırlanıyor"
+            job["note"] = "preparing"
             touch()
 
             ytdlp = find_ytdlp()
             if not ytdlp:
-                job["msg"] = "yt-dlp bulunamadı (PATH'te yt-dlp.exe olmalı)"
+                job["msg"] = "yt-dlp not found (yt-dlp.exe must be in PATH)"
                 log("❌ " + job["msg"] + "\n", "err")
                 return
             if ytdlp != self._logged_ytdlp:
@@ -988,7 +988,7 @@ class App(tk.Tk):
 
             hdr_args = self._header_args(job["headers"])
             if hdr_args:
-                log("🔑 Eklentiden gelen başlıklar kullanılıyor: "
+                log("🔑 Using headers from the extension: "
                     + ", ".join(job["headers"].keys()) + "\n", "inf")
             speed_args, speed_msg = self._speed_args(job["speed"])
             log(f"⚡ {speed_msg}\n", "inf")
@@ -1001,7 +1001,7 @@ class App(tk.Tk):
             if predicted:
                 out_path = self._unique_path(predicted)
                 if out_path != predicted:
-                    log(f"📋 Mevcut dosya var → {os.path.basename(out_path)}\n", "inf")
+                    log(f"📋 File already exists → {os.path.basename(out_path)}\n", "inf")
                 job["title"] = os.path.basename(out_path)
                 job["out_path"] = out_path
                 out_arg = out_path.replace("%", "%%")   # -o şablonunda '%' özel karakterdir
@@ -1010,7 +1010,7 @@ class App(tk.Tk):
 
             job["note"] = ""
             touch()
-            log("▶ İndirme başlıyor...\n", "inf")
+            log("▶ Starting download...\n", "inf")
 
             cmd = [ytdlp, "--ignore-config", "--newline"] + self._format_args(job["quality"])
             cmd += ["-o", out_arg]
@@ -1067,12 +1067,12 @@ class App(tk.Tk):
             else:
                 status = ST_ERR
                 if rc == 3:
-                    job["msg"] = ("yt-dlp yerine bu programın kendisi çalıştı. Exe'nin adı "
-                                  "'yt-dlp.exe' olmasın ve PATH'teki yt-dlp.exe'yi kontrol et.")
+                    job["msg"] = ("This program ran itself instead of yt-dlp. The exe must not be named "
+                                  "'yt-dlp.exe'; also check the yt-dlp.exe in PATH.")
                 elif not job["msg"]:
-                    job["msg"] = f"yt-dlp hata kodu {rc}"
+                    job["msg"] = f"yt-dlp error code {rc}"
         except FileNotFoundError:
-            job["msg"] = "yt-dlp bulunamadı! PATH'e eklenmiş mi?"
+            job["msg"] = "yt-dlp not found! Is it added to PATH?"
         except Exception as e:
             job["msg"] = str(e)
         finally:
@@ -1088,22 +1088,22 @@ class App(tk.Tk):
         jid = job["id"]
         title = short(job["title"], 60)
         if job["status"] == ST_DONE:
-            self._write_log(f"✅ [#{jid}] Tamamlandı: {job['title']}\n", "ok")
+            self._write_log(f"✅ [#{jid}] Completed: {job['title']}\n", "ok")
             self._notify(f"✅ {title}")
         elif job["status"] == ST_CANCEL:
-            self._write_log(f"⏹ [#{jid}] İptal edildi\n", "inf")
+            self._write_log(f"⏹ [#{jid}] Cancelled\n", "inf")
         else:
             why = f": {job['msg']}" if job["msg"] else ""
-            self._write_log(f"❌ [#{jid}] Başarısız{why}\n", "err")
+            self._write_log(f"❌ [#{jid}] Failed{why}\n", "err")
             self._notify(f"❌ {title}")
 
     # ── Kuyruk listesi ─────────────────────────────────────────
     def _row_values(self, j):
         st = j["status"]
         if st == ST_RUN:
-            status = j["note"] or "indiriliyor"
+            status = j["note"] or "downloading"
             if j["stage"] > 1 and not j["note"]:
-                status += f" ({j['stage']}. akış)"
+                status += f" #{j['stage']}"
         else:
             status = st
         if st in (ST_RUN, ST_MERGE, ST_DONE):
@@ -1138,21 +1138,21 @@ class App(tk.Tk):
                        if j["status"] in (ST_DONE, ST_ERR, ST_CANCEL))
         parts = []
         if running:
-            parts.append(f"{len(running)} indiriliyor")
+            parts.append(f"{len(running)} downloading")
         if waiting:
-            parts.append(f"{waiting} bekliyor")
+            parts.append(f"{waiting} waiting")
         if finished:
-            parts.append(f"{finished} bitti")
-        self.lbl_queue.config(text=" · ".join(parts) if parts else "Kuyruk boş")
+            parts.append(f"{finished} finished")
+        self.lbl_queue.config(text=" · ".join(parts) if parts else "Queue empty")
 
         # Görev çubuğunda küçültülmüş hâlde de ilerleme görünsün
         if running:
-            t = f"yt-dlp İndirici — %{running[0]['percent']:.0f}"
+            t = f"UHF Downloader — {running[0]['percent']:.0f}%"
             if waiting:
-                t += f" (+{waiting} bekliyor)"
+                t += f" (+{waiting} waiting)"
             self.title(t)
         else:
-            self.title("yt-dlp İndirici")
+            self.title("UHF Downloader")
 
     def _selected_jobs(self):
         sel = set(self.tree.selection())
@@ -1169,7 +1169,7 @@ class App(tk.Tk):
     def _cancel_selected(self):
         jobs = self._selected_jobs()
         if not jobs:
-            self._write_log("ℹ Önce listeden iptal edilecek satırı seç.\n", "inf")
+            self._write_log("ℹ Select a row to cancel first.\n", "inf")
             return
         for j in jobs:
             self._cancel_job(j)
@@ -1178,13 +1178,13 @@ class App(tk.Tk):
     def _retry_selected(self):
         jobs = [j for j in self._selected_jobs() if j["status"] in (ST_ERR, ST_CANCEL)]
         if not jobs:
-            self._write_log("ℹ Yeniden denemek için hata veren ya da iptal edilen bir satır seç.\n", "inf")
+            self._write_log("ℹ Select a failed or cancelled row to retry.\n", "inf")
             return
         for j in jobs:
             j.update(status=ST_WAIT, percent=0.0, speed_txt="", eta="",
                      msg="", note="", stage=0, cancel=False)
             self._pending.put(j)
-            self._write_log(f"↻ [#{j['id']}] Yeniden kuyruğa alındı\n", "inf")
+            self._write_log(f"↻ [#{j['id']}] Re-queued\n", "inf")
         self._refresh_tree()
 
     def _remove_jobs(self, jobs):
@@ -1199,7 +1199,7 @@ class App(tk.Tk):
             if j in self._jobs_list:
                 self._jobs_list.remove(j)
         if busy:
-            self._write_log("ℹ Çalışan indirme iptal edildi; bittiğinde tekrar 'Kaldır'a bas.\n", "inf")
+            self._write_log("ℹ Running download cancelled; press Remove again once it stops.\n", "inf")
         self._refresh_tree()
 
     def _remove_selected(self):
@@ -1222,7 +1222,7 @@ class App(tk.Tk):
             else:
                 subprocess.Popen(["xdg-open", d])
         except Exception as e:
-            self._write_log(f"⚠ Klasör açılamadı: {e}\n", "err")
+            self._write_log(f"⚠ Could not open folder: {e}\n", "err")
 
     def _on_tree_rightclick(self, event):
         iid = self.tree.identify_row(event.y)
