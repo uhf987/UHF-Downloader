@@ -108,20 +108,6 @@ Eklenti olmadan da kullanabilirsin. Araç, panoya kopyalanan şu üç biçimi ta
 
 Araç çerez gereken sitelerde (Instagram gibi) varsayılan olarak **Firefox'un** çerezlerini okur (`--cookies-from-browser firefox`). Chrome ve Edge'in çerez şifrelemesi yüzünden yt-dlp onları güvenilir okuyamayabiliyor. Başka bir kaynak istersen arayüzdeki **COOKIES** alanından bir `cookies.txt` dosyası seçebilirsin, o zaman Firefox yerine o kullanılır.
 
-## Exe olarak paketleme
-
-```
-python -m pip install pyinstaller pystray pillow
-python -m PyInstaller --onefile --noconsole --name "YT-DLP Indirici" --icon icon.ico --hidden-import pystray._win32 yt_dlp_gui.py
-```
-
-Çıktı `dist\YT-DLP Indirici.exe` olarak oluşur. yt-dlp ve ffmpeg exe'nin içine girmez, kullanıcının bilgisayarında kurulu olmaları gerekir.
-
-Notlar:
-
-- `--noconsole` ile yapılan exe'lerde yt-dlp her çalıştığında siyah bir pencere açılmasın diye kod gizli pencere ayarıyla çalıştırılıyor.
-- `--onefile` exe'leri bazen antivirüs tarafından yanlışlıkla şüpheli bulunur. Sorun olursa `--onedir` ile derle.
-
 ## Güvenlik
 
 - Yerel sunucu yalnızca `127.0.0.1` adresinde dinler, dış ağdan erişilemez.
